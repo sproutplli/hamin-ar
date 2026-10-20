@@ -1,145 +1,130 @@
 <!DOCTYPE html>
 <html>
 <head>
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>AR Photocard</title>
 
-
-  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
-
-  <!-- MindAR -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-
-
-  <!-- GLB animation -->
   <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
 
+  <style>
+    html, body { margin: 0; background: #000; overflow: hidden; }
+    #loading {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #000; color: #fff;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: sans-serif; font-size: 16px;
+      transition: opacity 0.4s;
+    }
+    #loading.hide { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 40px; height: 40px; margin-bottom: 16px;
+      border: 4px solid #444; border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 
-  <!-- Material fix -->
   <script>
-
     AFRAME.registerComponent('fix-material', {
-
       init: function () {
-
         this.el.addEventListener('model-loaded', () => {
-
           const mesh = this.el.getObject3D('mesh');
-
           if (!mesh) return;
-
-
           mesh.traverse((node) => {
-
             if (node.isMesh && node.material) {
-
               node.material.depthWrite = true;
-
               node.material.alphaTest = 0.5;
-
               node.material.needsUpdate = true;
-
             }
-
           });
-
         });
-
       }
-
     });
-
   </script>
-
 </head>
 
+<body>
 
-<body style="margin: 0; overflow: hidden;">
-
+  <div id="loading">
+    <div class="spinner"></div>
+    <div id="loading-text">불러오는 중...</div>
+  </div>
 
   <a-scene
-
     mindar-image="
       imageTargetSrc: ./targets.mind;
-
-      autoStart: true;
-
-      uiLoading: yes;
-
+      autoStart: false;
+      uiLoading: no;
       uiScanning: yes;
-
+      uiError: yes;
       filterMinCF: 0.001;
-      
       filterBeta: 15;
-
       missTolerance: 10;
-
       warmupTolerance: 5;
     "
-
     color-space="sRGB"
-
-    renderer="
-      colorManagement: true;
-      physicallyCorrectLights: true;
-    "
-
+    renderer="colorManagement: true; physicallyCorrectLights: true;"
     vr-mode-ui="enabled: false"
-
     device-orientation-permission-ui="enabled: false"
-
   >
 
-
-    <!-- ASSETS -->
-
-    <a-assets>
-
-      <a-asset-item
-        id="avatarModel"
-        src="./model.glb">
-      </a-asset-item>
-
+    <a-assets timeout="30000">
+      <a-asset-item id="avatarModel" src="./model.glb"></a-asset-item>
     </a-assets>
 
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
+    <a-entity mindar-image-target="targetIndex: 0">
 
-    <!-- CAMERA -->
+      <!-- 배경 큐브 두 개는 이 안에 넣으세요 -->
 
-    <a-camera
-
-      position="0 0 0"
-
-      look-controls="enabled: false"
-
-    ></a-camera>
-
-
-
-    <!-- IMAGE TARGET -->
-
-    <a-entity
-      mindar-image-target="targetIndex: 0"
-    >
-
-
-      <!-- CHARACTER -->
-
-      <a-entity 
-        id="model" 
-        gltf-model="#avatarModel" 
-        position="0 -0.2 0" 
-        scale="0.3 0.3 0.3" 
-        rotation="68 0 0" 
-        animation-mixer="loop: repeat;" 
+      <a-entity
+        id="model"
+        gltf-model="#avatarModel"
+        position="0 -0.2 0"
+        scale="0.3 0.3 0.3"
+        rotation="68 0 0"
+        animation-mixer="loop: repeat;"
         fix-material>
-</a-entity>
+      </a-entity>
+
+    </a-entity>
 
   </a-scene>
+
+  <script>
+    const scene = document.querySelector('a-scene');
+    const assets = document.querySelector('a-assets');
+    const loading = document.getElementById('loading');
+    const loadingText = document.getElementById('loading-text');
+
+    let assetsReady = assets.hasLoaded;
+    let sceneReady = scene.hasLoaded;
+    let started = false;
+
+    function tryStart() {
+      if (started || !assetsReady || !sceneReady) return;
+      started = true;
+      loadingText.textContent = '카메라 권한을 허용해 주세요';
+      scene.systems['mindar-image-system'].start();
+    }
+
+    if (!assetsReady) assets.addEventListener('loaded', () => { assetsReady = true; tryStart(); });
+    if (!sceneReady) scene.addEventListener('loaded', () => { sceneReady = true; tryStart(); });
+    tryStart();
+
+    scene.addEventListener('arReady', () => {
+      loading.classList.add('hide');
+      setTimeout(() => loading.remove(), 500);
+    });
+
+    scene.addEventListener('arError', () => {
+      loadingText.textContent = '카메라를 시작할 수 없어요. 권한을 확인하고 새로고침해 주세요.';
+    });
+  </script>
 
 </body>
 </html>
